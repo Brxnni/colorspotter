@@ -3,7 +3,15 @@ import numpy as np
 
 import pathlib
 LOCAL = pathlib.Path(__file__).parent
-image = cv2.imread(LOCAL / "images" / "mathe_test.jpg")
+image = cv2.imread(LOCAL / "w12images" / "WhatsApp Image 2024-11-15 at 17.38.09 (1).jpeg")
+
+images = [ cv2.imread(LOCAL / "w12images" / a) for a in [
+	"WhatsApp Image 2024-11-15 at 17.38.35 (4).jpeg",
+	"WhatsApp Image 2024-11-15 at 17.38.09.jpeg",
+	"WhatsApp Image 2024-11-15 at 17.38.49 (2).jpeg"
+] ]
+
+# cv2.imshow("Original image", image)
 
 # Crop to remove table
 # image = image[37:2387, 56:7079]
@@ -30,15 +38,26 @@ hsv_image = cv2.cvtColor(image, cv2.COLOR_BGR2HSV)
 # total_area = sum([ cv2.contourArea(c) for c in contours ])
 # print(f"Total area in pixels: {total_area}")
 
-lines_mask = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
-edges = cv2.Canny(lines_mask, 20, 120)
-lines = cv2.HoughLinesP(edges, 1, np.pi/180, 1, np.array([]), 5, 1)
+for i, img in enumerate(images):
+	hsv_img = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
 
-for line in lines:
-	for x1, y1, x2, y2 in line:
-		cv2.line(lines_mask, (x1, y1), (x2, y2), (255, 0, 255), 5)
+	# -> Grayscale
+	lines_image = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+	# Find lines via threshold
+	thresh = cv2.adaptiveThreshold(lines_image, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, 31, 15)
+	lines_image[thresh == 255] = 255
+	lines_image = cv2.bitwise_not(lines_image)
+	cv2.imshow(f"Contrast{i}", cv2.resize(lines_image, None, fx=1/2, fy=1/2))
+	
+	lines = cv2.HoughLinesP(lines_image, 1, np.pi/180, 1, np.array([]), 150, 2)
+	lines_image = cv2.cvtColor(lines_image, cv2.COLOR_GRAY2BGR)
+	for line in lines:
+		for x1, y1, x2, y2 in line:
+			cv2.line(lines_image, (x1, y1), (x2, y2), (255, 255, 0), 2)
 
-cv2.imshow("Lines mask", lines_mask)
-
-# cv2.imshow("Fancy output", cv2.resize(out, (960, 540)))
+	cv2.imshow(f"Detected Lines{i}", lines_image)
 cv2.waitKey(0)
+
+# Find lines
+
+# cv2.imwrite(LOCAL / "out.png", lines_image)
