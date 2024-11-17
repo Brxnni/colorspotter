@@ -2,11 +2,12 @@
 
 ## Lines
 
-1. Find right contrast value such that enough lines are found for the following steps to make sense
-    - Things that dont work: Harris Corner Detection
-2. Assign a thickness and angle every line
-3. Split lines into "thick" and "thin" ones
-4. Try to find thick lines that are parallel (i.e. have a similar angle)
+* Find right contrast value such that multiple 1mm lines are found
+  * Things that dont work: Harris Corner Detection
+  * Found one: HoughLines P works well enough
+* ~~Assign a thickness and angle to every line~~
+* ~~Split lines into "thick" and "thin" ones~~
+* Try to find lines that are parallel (i.e. have a similar angle)
 
 ## Circle
 
@@ -14,5 +15,5 @@
 
 ## Final
 
-1. Find the lines closest to the purple circle -> two thick lines are 1cm apart
+1. Find the lines closest to the purple circle -> two lines are 1mm apart
 2. Use those to calculate the real-world area of the circle
