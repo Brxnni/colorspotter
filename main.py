@@ -60,26 +60,7 @@ def isSquare(contour):
 	# return solidity > 0.95
 	return abs(aspect_ratio - 1) < 0.1
 
-def findSquareContours(i):
-	img = cv2.cvtColor(i, cv2.COLOR_BGR2GRAY)
-
-	blurred = cv2.GaussianBlur(img, (5, 5), 0)
-	thresh = cv2.adaptiveThreshold(blurred, 255, cv2.ADAPTIVE_THRESH_MEAN_C, cv2.THRESH_BINARY, THRESH_VALUES.get(i, 9), 2)
-	thresh[thresh > 0] = 255
-
-	# Find lines in thresh
-	contours, _ = cv2.findContours(thresh, cv2.RETR_CCOMP, cv2.CHAIN_APPROX_SIMPLE)
-	contours = [ c for c in contours if cv2.contourArea(c) > 10 ]
-	contours = [ c for c in contours if isSquare(c) ]
-	print(i, "|", len(contours))
-	
-	thresh = cv2.cvtColor(thresh, cv2.COLOR_GRAY2BGR)
-	for idx, contour in enumerate(contours):
-		cv2.drawContours(image=thresh, contours=contours, contourIdx=idx, color=randomColor(), thickness=1)
-
-	cv2.imshow(f"Detected Edges{i}", thresh)
-
-def findGridLines(i):
+def findGridLinesHLP(i):
 	img = cv2.cvtColor(i, cv2.COLOR_BGR2GRAY)
 
 	blurred = cv2.GaussianBlur(img, (11, 11), 0)
@@ -146,14 +127,31 @@ def findGridLines(i):
 	showImage(f"Found lines {i[0][:3]}", out, True)
 	cv2.imwrite(LOCAL / "gridlines.png", out)
 
-def isDropShaped(c):
-	area = cv2.contourArea(c)
-	hull = cv2.convexHull(c)
+def findGridLines_Various_Shit_I_Am_So_Tired_Rn_Ong_Fr_Fr(idx, i):
+	img = cv2.cvtColor(i, cv2.COLOR_BGR2HSV)
+	# Find red-ish pixels (lines)
+	lower = np.array([10/360*180, 120, 70])
+	upper = np.array([50/360*180, 245, 200])
+	# ^ these are magic values, change these and nothing works :D
+	mask = cv2.inRange(img, lower, upper)
 
-	hull_area = cv2.contourArea(hull)
-	if hull_area == 0: return False
-	solidity = float(area) / hull_area
-	return solidity >= 0.75
+	# Filter out only red-ish pixels, make everything else black
+	img = cv2.bitwise_and(img, img, mask=mask)
+
+	# HSV -> Grayscale to find lines
+	bgr = cv2.cvtColor(img, cv2.COLOR_HSV2BGR)
+	gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
+	lines = cv2.HoughLinesP(gray, rho=1, theta=np.pi/180, threshold=255, minLineLength=20, maxLineGap=7)
+
+	# Debug stuff
+	out = img.copy()
+	out = cv2.cvtColor(out, cv2.COLOR_HSV2BGR)
+
+	for line in lines:
+		for (x1, y1, x2, y2) in line:
+			cv2.line(out, (x1, y1), (x2, y2), (255, 0, 0), 1)
+
+	showImage(f"various.shit.* {idx}", out)
 
 def findDropWithComps(idx, i):
 	# i = cv2.resize(i, None, fx=4, fy=4)
@@ -178,10 +176,11 @@ I = list(enumerate(images))[0:]
 # random.shuffle(I)
 
 for i, img in I:
-	# findGridLines(img)
-	findDropWithComps(i, img)
-	print(i)
-	# break
+	findGridLines_Various_Shit_I_Am_So_Tired_Rn_Ong_Fr_Fr(i, img)
+	# findGridLinesHLP(img)
+	# findDropWithComps(i, img)
+	# print(i)
+	break
 	# continue
 
 cv2.waitKey(0)

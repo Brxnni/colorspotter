@@ -14,5 +14,5 @@
 
 ## Final
 
-*. Find the lines closest to the purple circle -> two lines are 1mm apart
-*. Use those lines' pixel distances to calculate the relationship between pixels and real-world units -> actual area of the drop in the image
+* Find the lines closest to the purple circle -> two lines are 1mm apart
+* Use those lines' pixel distances to calculate the relationship between pixels and real-world units -> calculate actual area of the drop in the image
