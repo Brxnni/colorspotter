@@ -155,53 +155,6 @@ def isDropShaped(c):
 	solidity = float(area) / hull_area
 	return solidity >= 0.75
 
-def findDropWithContours(idx, i):
-	# i = cv2.resize(i, None, fx=4, fy=4)
-	# Blur
-	# Filter out purple 
-	hsv_image = cv2.cvtColor(i, cv2.COLOR_BGR2HSV)
-
-	# Dark Purple
-	mask_1 = cv2.inRange(hsv_image, (270/360*180, 0, 0), (340/360*180, 255, 90))
-	# Black
-	mask_2 = cv2.inRange(hsv_image, (0, 0, 0), (255, 255, 20))
-	blob_mask = cv2.bitwise_or(mask_1, mask_2)
-	# blob_mask = cv2.dilate(blob_mask, np.ones((4, 4)))
-
-	cv2.imwrite(LOCAL / "out0.png", blob_mask)
-	showImage(f"Block Mask {idx}", blob_mask)
-
-	contours = cv2.findContours(
-		cv2.threshold(blob_mask, 128, 255, cv2.THRESH_BINARY)[1],
-		cv2.RETR_EXTERNAL,
-		cv2.CHAIN_APPROX_SIMPLE
-	)
-	contours = contours[0] if len(contours) == 2 else contours[1]
-
-	print(len(contours))
-	contours = [ c for c in contours if isDropShaped(c) ]
-	print(len(contours))
-	contours = [ c for c in contours if cv2.contourArea(c) > 2 ]
-	print(len(contours))
-	contours = sorted(contours, key = lambda c: -cv2.contourArea(c))
-	print([ cv2.contourArea(a) for a in contours ])
-
-	# Visualize found blobs
-	out = i.copy()
-	# out = cv2.bitwise_and(i, i, mask=blob_mask)
-	for idx, c in enumerate(contours):
-		color = (255, 0, 0) if idx == 0 else (0, 0, 255)
-		cv2.drawContours(out, contours, idx, color, 5)
-	showImage(f"Found purple drop {idx}", out)
-	cv2.imwrite(LOCAL / "out1.png", out)
-
-	total_area = 0
-	if len(contours) > 0:
-		contours = contours[0]
-		# Calculate area of blobs
-		total_area = sum([ cv2.contourArea(c) for c in contours ])
-	print(f"Total area in pixels: {total_area}")
-
 def findDropWithComps(idx, i):
 	# i = cv2.resize(i, None, fx=4, fy=4)
 	# Filter out purple 
@@ -225,8 +178,8 @@ I = list(enumerate(images))[0:]
 # random.shuffle(I)
 
 for i, img in I:
-	findGridLines(img)
-	# findDropWithComps(i, img)
+	# findGridLines(img)
+	findDropWithComps(i, img)
 	print(i)
 	# break
 	# continue
