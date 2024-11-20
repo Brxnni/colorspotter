@@ -1,8 +1,9 @@
+from shapely.geometry import LineString
+# from scipy.stats import mode
 import colorsys
 import random
 import numpy as np
 import math
-# import json
 import cv2
 import os
 
@@ -10,6 +11,7 @@ import pathlib
 LOCAL = pathlib.Path(__file__).parent
 IMAGES = LOCAL / "w12_images"
 images = [ cv2.imread(IMAGES / path) for path in os.listdir(IMAGES) ]
+filenames = [ path for path in os.listdir(IMAGES) ]
 
 # Common use colors
 WHITE = (255, 255, 255)
@@ -20,6 +22,26 @@ RED = (0, 0, 255)
 YELLOW = (0, 255, 255)
 CYAN = (255, 255, 0)
 MAGENTA = (255, 0, 255)
+
+def find_mode(nums, epsilon):
+	nums.sort()
+	maxn = nums[-1]
+	prev = maxn
+	mode = 0
+	maxcount = 0
+	current = 0
+
+	for n in nums:
+		if abs(n - prev) <= epsilon:
+			current += 1
+			if current > maxcount:
+				maxcount = current
+				mode = n
+		else:
+			current = 1
+		prev = n
+	
+	return mode
 
 # Scales image before calling `imshow` down so it fits on my monitor (only 2k smh)
 def showImage(title, i, scale=True):
@@ -59,24 +81,10 @@ def angleToColor(θ):
 		)
 	)
 
-def isSquare(contour):
-	area = cv2.contourArea(contour)
-	x, y, width, height = cv2.boundingRect(contour)
-	aspect_ratio = float(width) / height
-
-	hull = cv2.convexHull(contour)
-	hull_area = cv2.contourArea(hull)
-	if hull_area == 0: return False
-	solidity = float(area) / hull_area
-
-	print(solidity)
-	# return solidity > 0.95
-	return abs(aspect_ratio - 1) < 0.1
-
-def findGridLines(idx, i):
+def findGridSize(filename, i):
 	img = cv2.cvtColor(i, cv2.COLOR_BGR2HSV)
 	# Find red-ish pixels (lines)
-	lower = np.array([10/360*180, 120, 70])
+	lower = np.array([5/360*180, 100, 70])
 	upper = np.array([50/360*180, 245, 200])
 	# ^ these are magic values, change these and nothing works :D
 	mask = cv2.inRange(img, lower, upper)
@@ -99,16 +107,7 @@ def findGridLines(idx, i):
 		"angle": abs(math.atan2(-(y2-y1), x2-x1))
 	} for line in lines for (x1, y1, x2, y2) in line ]
 
-	# Remove lines with Dx=0
-	# lines = [ line for line in lines if line[0][0] != line[0][1] ]
-
-	# with open(LOCAL / "lines_slopes.json", "r") as file:
-	# 	data = json.loads(file.read())
-	# with open(LOCAL / "lines_slopes.json", "w") as file:
-	# 	data.append([ line["angle"] for line in lines ])
-	# 	file.write(json.dumps(data))
-
-	hist, bin_edges = np.histogram([ line["angle"] for line in lines ], bins = 10)
+	hist, bin_edges = np.histogram([ line["angle"] for line in lines ], bins = 25)
 
 	# Find two most common angles (these correspond to the vertical and horizontal lines)
 	bin_idx1, bin_idx2 = np.argpartition(hist, -2)[-2:]
@@ -119,71 +118,98 @@ def findGridLines(idx, i):
 	lines1 = [ line for line in lines if θ_range1[0] <= line["angle"] <= θ_range1[1] ]
 	lines2 = [ line for line in lines if θ_range2[0] <= line["angle"] <= θ_range2[1] ]
 
+	points, cm_distance = intersectionDistance(lines1, lines2)
+
+	# SPECIAL CASE: Only in these two images (everywhere else it works perfectly),
+	# the program returns the distance between the 5mm lines (because it detected them too),
+	# so the distance needs to be doubled
+	if filename[:2] in ["B1", "B2"]:
+		cm_distance *= 2
+
 	# Debug stuff
 	out = img.copy()
 	out = cv2.cvtColor(out, cv2.COLOR_HSV2BGR)
 
-	for line in lines:
-		cv2.line(out, line["pt1"], line["pt2"], randomColor(), 2)
-	# for line in lines1:
-	# 	cv2.line(out, line["pt1"], line["pt2"], MAGENTA, 2)
-	# for line in lines2:
-		# cv2.line(out, line["pt1"], line["pt2"], YELLOW, 2)
+	for line in [*lines1, *lines2]:
+		cv2.line(out, line["pt1"], line["pt2"], WHITE, 2)
 
-	# d = abs(t2-t1)/sqrt(1+m**2)
-	# Find average y-intercept difference
+	for point in points:
+		x, y = point
+		x, y = int(x), int(y)
+		# cv2.circle(out, (x, y), 5, GREEN, 10)
+		cv2.line(out, (x, y), (x, y + int(cm_distance)), randomColor(), 6)
 
-	# Filter out lines with Dx=0 (i'm too lazy to calculate x-intercepts)
-	y_intercepts1 = [ line for line in lines1 if line["x1"] != line["x2"] ]
-	y_intercepts2 = [ line for line in lines2 if line["x1"] != line["x2"] ]
+	# showImage(f"Detected Lines {filename}", out)
+	new_filename = filename.split(".")[0] + "_lines.png"
+	cv2.imwrite(LOCAL / "w12_out" / new_filename, img)
+	return cm_distance
+
+def intersectionDistance(lines1, lines2):
+	lines1 = [ LineString([line["pt1"], line["pt2"]]) for line in lines1 ]
+	lines2 = [ LineString([line["pt1"], line["pt2"]]) for line in lines2 ]
+
+	points = []
+	for line1 in lines1:
+		for line2 in lines2:
+
+			if line1.intersects(line2):
+				intersection = line1.intersection(line2)
+				points.append((intersection.x, intersection.y))
 	
-	# y_intercepts = max(y_intercepts1, y_intercepts2, key=len)
-	y_intercepts = y_intercepts1
+	neighbour_distances = []
+	for point in points:
+		distances = []
+		for other_point in points:
+			distance = math.hypot(abs(point[0]-other_point[0]), abs(point[1]-other_point[1]))
+			if distance <= 20: continue
+			distances.append(distance)
+		
+		distances.sort()
+		shortest = distances[:4]
+		avg_neighbour_distance = sum(shortest) / 4
+		neighbour_distances.append(avg_neighbour_distance)
 
-	# t = y0-mx0
-	y_intercepts = sorted([ line["y1"] - (line["y2"]-line["y1"])/(line["x2"]-line["x1"])*line["x1"] for line in y_intercepts ])
-	
-	for y in y_intercepts:
-		cv2.line(out, (0, round(y)), (30, round(y)), RED, 2)
-	
-	distances = np.diff(y_intercepts)
-	# distances = [ d for d in distances if d > 10 ]
-	for d in distances: print(d)
-	# print(y_intercepts)
-	print(">>>", np.mean(distances))
+	neighbour_distances.sort()
+	mode = find_mode(neighbour_distances, 0.2)
 
-	showImage(f"Detected Lines {idx}", out)
+	return points, mode
 
-def findDropWithComps(idx, i):
+def findDropArea(filename, img):
 	# i = cv2.resize(i, None, fx=4, fy=4)
 	# Filter out purple 
-	hsv_image = cv2.cvtColor(i, cv2.COLOR_BGR2HSV)
+	hsv_image = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
 
 	# Dark Purple
 	mask_1 = cv2.inRange(hsv_image, (270/360*180, 0, 0), (340/360*180, 255, 90))
-	# Black (Dark Gr[ae]y)
-	mask_2 = cv2.inRange(hsv_image, (0, 0, 0), (255, 255, 20))
+	# Black and Dark Gray
+	mask_2 = cv2.inRange(hsv_image, (0, 0, 0), (180, 255, 47)) # <- last V value is this and not 30 because of A6
 	blob_mask = cv2.bitwise_or(mask_1, mask_2)
 
-	showImage(f"Blob Mask {idx}", blob_mask)
-	cv2.imwrite(LOCAL / "blobmask.png", blob_mask)
+	# A1 is so fucking tiny that this gets rid of the blob completely
+	if not filename.startswith("A1"):
+		blob_mask = cv2.morphologyEx(blob_mask, cv2.MORPH_OPEN, np.ones((3, 3)))
 
-	_, _, stats, _ = cv2.connectedComponentsWithStats(blob_mask)
-	blob = sorted(list(stats)[1:], key=lambda row: -row[4])[0]
-	area = blob[4]
-	print(f"Total area in pixels: {area}")
+	contours, _ = cv2.findContours(blob_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+	blobs = [ cv2.contourArea(contour) for contour in contours ]
+	blobs.sort()
+	area = blobs[-1]
+
+	for c in contours:
+		cv2.drawContours(img, [c], 0, randomColor(), 2)
+	
+	# showImage(f"Blob Mask {filename}", img)
+	new_filename = filename.split(".")[0] + "_blob.png"
+	cv2.imwrite(LOCAL / "w12_out" / new_filename, img)
+	return area
 
 I = list(enumerate(images))[0:]
-random.shuffle(I)
-
-# with open(LOCAL / "lines_slopes.json", "w") as file:
-	# file.write("[]")
 
 for i, img in I:
-	findGridLines(i, img)
-	# findDropWithComps(i, img)
-	# print(i)
-	break
-	# continue
+	filename = filenames[i]
+	
+	distance = findGridSize(filename, img)
+	area = findDropArea(filename, img)
+
+	print(filename, "Area: ", area/(distance**2))
 
 cv2.waitKey(0)
