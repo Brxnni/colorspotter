@@ -2,10 +2,8 @@
 
 ## Lines
 
-* Find right contrast value such that multiple 1mm lines are found
-  * Things that dont work: Harris Corner Detection
-  * Found one: HoughLines P works well enough (no it really doesn't :/ im gonna have to find something else)
-* Try to find lines that are parallel (i.e. have a similar angle)
+* ✅ Find right contrast value such that multiple 1cm lines are found
+* ✅ Try to find lines that are parallel (i.e. have a similar angle)
 
 ## Circle
 
