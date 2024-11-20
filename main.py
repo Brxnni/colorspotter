@@ -214,14 +214,15 @@ for i, img in I:
 	area_px = findDropArea(filename, img)
 	area_cm2 = area_px/(distance_px**2)
 
-	# ±2.5 pixels for line finding due to lines themselves being around 5 pixels wide
-	distance_error_abs = 2.5
+	# ±3.5 pixels for line finding due to lines themselves being around 7 pixels wide
+	distance_error_abs = 3.5
 	distance_error_rel = distance_error_abs / distance_px
 	# Total error: Area error (=0) + 2 * Distance Error
 	total_error_rel = 2*distance_error_rel
 	errors.append(total_error_rel)
 
-	print(filename, "Area: ", round(area_cm2, 3), f"(Error: ±{round(total_error_rel*100, 2)}%)")
+	area_str = f"{round(area_cm2, 7)} ≈ {round(area_cm2, 3)}"
+	print(filename.split(".")[0], "|", "Area:", f"{area_str:<17}", " ; ", f"Error: ±{round(total_error_rel*100, 2)}%")
 
 print("Total average error:", round(100*sum(errors)/len(errors), 2), "%")
 
