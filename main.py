@@ -141,7 +141,7 @@ def findGridSize(filename, i):
 
 	# showImage(f"Detected Lines {filename}", out)
 	new_filename = filename.split(".")[0] + "_lines.png"
-	cv2.imwrite(LOCAL / "w12_out" / new_filename, img)
+	# cv2.imwrite(LOCAL / "w12_out" / new_filename, img)
 	return cm_distance
 
 def intersectionDistance(lines1, lines2):
@@ -191,6 +191,8 @@ def findDropArea(filename, img):
 
 	contours, _ = cv2.findContours(blob_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
 	blobs = [ cv2.contourArea(contour) for contour in contours ]
+	if filename[:2] == "A6":
+		blobs = [ cv2.contourArea(cv2.convexHull(contour)) for contour in contours ]
 	blobs.sort()
 	area = blobs[-1]
 
@@ -199,17 +201,28 @@ def findDropArea(filename, img):
 	
 	# showImage(f"Blob Mask {filename}", img)
 	new_filename = filename.split(".")[0] + "_blob.png"
-	cv2.imwrite(LOCAL / "w12_out" / new_filename, img)
+	# cv2.imwrite(LOCAL / "w12_out" / new_filename, img)
 	return area
 
 I = list(enumerate(images))[0:]
 
+errors = []
 for i, img in I:
 	filename = filenames[i]
 	
-	distance = findGridSize(filename, img)
-	area = findDropArea(filename, img)
+	distance_px = findGridSize(filename, img)
+	area_px = findDropArea(filename, img)
+	area_cm2 = area_px/(distance_px**2)
 
-	print(filename, "Area: ", area/(distance**2))
+	# ±2.5 pixels for line finding due to lines themselves being around 5 pixels wide
+	distance_error_abs = 2.5
+	distance_error_rel = distance_error_abs / distance_px
+	# Total error: Area error (=0) + 2 * Distance Error
+	total_error_rel = 2*distance_error_rel
+	errors.append(total_error_rel)
+
+	print(filename, "Area: ", round(area_cm2, 3), f"(Error: ±{round(total_error_rel*100, 2)}%)")
+
+print("Total average error:", round(100*sum(errors)/len(errors), 2), "%")
 
 cv2.waitKey(0)
