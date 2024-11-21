@@ -81,7 +81,47 @@ def angleToColor(θ):
 		)
 	)
 
-def findGridSize(filename, i):
+# [0, 1] -> Bright color
+def coordToColor(normalized):
+	return tuple(
+		reversed(
+			[ round(i*255) for i in colorsys.hsv_to_rgb(
+				(normalized * 3) % 1, 1, 1
+			)]
+		)
+	)
+
+def intersectionDistance(lines1, lines2):
+	lines1 = [ LineString([line["pt1"], line["pt2"]]) for line in lines1 ]
+	lines2 = [ LineString([line["pt1"], line["pt2"]]) for line in lines2 ]
+
+	points = []
+	for line1 in lines1:
+		for line2 in lines2:
+
+			if line1.intersects(line2):
+				intersection = line1.intersection(line2)
+				points.append((intersection.x, intersection.y))
+
+	neighbour_distances = []
+	for point in points:
+		distances = []
+		for other_point in points:
+			distance = math.hypot(abs(point[0]-other_point[0]), abs(point[1]-other_point[1]))
+			if distance <= 20: continue
+			distances.append(distance)
+
+		distances.sort()
+		shortest = distances[:4]
+		avg_neighbour_distance = sum(shortest) / 4
+		neighbour_distances.append(avg_neighbour_distance)
+
+	neighbour_distances.sort()
+	mode = find_mode(neighbour_distances, 0.2)
+
+	return points, mode
+
+def findGridSize(filename, i, debug=False):
 	img = cv2.cvtColor(i, cv2.COLOR_BGR2HSV)
 	# Find red-ish pixels (lines)
 	lower = np.array([5/360*180, 100, 70])
@@ -90,10 +130,10 @@ def findGridSize(filename, i):
 	mask = cv2.inRange(img, lower, upper)
 
 	# Filter for only red-ish pixels, make everything else black
-	img = cv2.bitwise_and(img, img, mask=mask)
+	filtered = cv2.bitwise_and(img, img, mask=mask)
 
 	# HSV -> Grayscale to find lines
-	bgr = cv2.cvtColor(img, cv2.COLOR_HSV2BGR)
+	bgr = cv2.cvtColor(filtered, cv2.COLOR_HSV2BGR)
 	gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
 	lines = cv2.HoughLinesP(gray, rho=1, theta=np.pi/180, threshold=255, minLineLength=80, maxLineGap=7)
 
@@ -126,92 +166,85 @@ def findGridSize(filename, i):
 	if filename[:2] in ["B1", "B2"]:
 		cm_distance *= 2
 
-	# Debug stuff
-	out = img.copy()
-	out = cv2.cvtColor(out, cv2.COLOR_HSV2BGR)
+	if debug:
+		out = img.copy()
+		out = cv2.cvtColor(out, cv2.COLOR_HSV2BGR)
 
-	for line in [*lines1, *lines2]:
-		cv2.line(out, line["pt1"], line["pt2"], WHITE, 2)
+		for line in [*lines1, *lines2]:
+			cv2.line(out, line["pt1"], line["pt2"], BLACK, 5)
 
-	for point in points:
-		x, y = point
-		x, y = int(x), int(y)
-		# cv2.circle(out, (x, y), 5, GREEN, 10)
-		cv2.line(out, (x, y), (x, y + int(cm_distance)), randomColor(), 6)
+		for point in points:
+			x, y = point
+			x, y = int(x), int(y)
+			cv2.circle(out, (x, y), 8, WHITE, 3, cv2.LINE_AA)
+			cv2.line(out, (x, y), (x, y + int(cm_distance)), coordToColor(y/img.shape[0]), 6)
 
-	# showImage(f"Detected Lines {filename}", out)
-	new_filename = filename.split(".")[0] + "_lines.png"
-	# cv2.imwrite(LOCAL / "w12_out" / new_filename, img)
+		# Display length of line in pixels
+		x, y = sorted([p for p in points if p[1] > 120])[0]
+		pos_x = int(x)
+		pos_y = int(y - 40)
+		text = f"d = {round(cm_distance, 3):,}px".replace(",", " ").replace(".", ",")
+
+		cv2.putText(out, text, (pos_x, pos_y), cv2.FONT_HERSHEY_SIMPLEX, 1.5, BLACK, 10, cv2.LINE_AA)
+		cv2.putText(out, text, (pos_x, pos_y), cv2.FONT_HERSHEY_SIMPLEX, 1.5, WHITE, 4, cv2.LINE_AA)
+
+		showImage(f"Detected Lines {filename}", out)
+		new_filename = filename.split(".")[0] + "_lines.png"
+		cv2.imwrite(LOCAL / "w12_out" / new_filename, out)
+	
 	return cm_distance
 
-def intersectionDistance(lines1, lines2):
-	lines1 = [ LineString([line["pt1"], line["pt2"]]) for line in lines1 ]
-	lines2 = [ LineString([line["pt1"], line["pt2"]]) for line in lines2 ]
-
-	points = []
-	for line1 in lines1:
-		for line2 in lines2:
-
-			if line1.intersects(line2):
-				intersection = line1.intersection(line2)
-				points.append((intersection.x, intersection.y))
-	
-	neighbour_distances = []
-	for point in points:
-		distances = []
-		for other_point in points:
-			distance = math.hypot(abs(point[0]-other_point[0]), abs(point[1]-other_point[1]))
-			if distance <= 20: continue
-			distances.append(distance)
-		
-		distances.sort()
-		shortest = distances[:4]
-		avg_neighbour_distance = sum(shortest) / 4
-		neighbour_distances.append(avg_neighbour_distance)
-
-	neighbour_distances.sort()
-	mode = find_mode(neighbour_distances, 0.2)
-
-	return points, mode
-
-def findDropArea(filename, img):
-	# i = cv2.resize(i, None, fx=4, fy=4)
+def findDropArea(filename, img, debug=False):
 	# Filter out purple 
 	hsv_image = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
-
 	# Dark Purple
 	mask_1 = cv2.inRange(hsv_image, (270/360*180, 0, 0), (340/360*180, 255, 90))
 	# Black and Dark Gray
 	mask_2 = cv2.inRange(hsv_image, (0, 0, 0), (180, 255, 47)) # <- last V value is this and not 30 because of A6
 	blob_mask = cv2.bitwise_or(mask_1, mask_2)
 
-	# A1 is so fucking tiny that this gets rid of the blob completely
+	# A1 is so fucking tiny that smoothing gets rid of the blob completely
 	if not filename.startswith("A1"):
 		blob_mask = cv2.morphologyEx(blob_mask, cv2.MORPH_OPEN, np.ones((3, 3)))
 
 	contours, _ = cv2.findContours(blob_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
 	blobs = [ cv2.contourArea(contour) for contour in contours ]
+	# A6 is weird because the red line is visible through the purple blob,
+	# so we need to get the convex hull to account for the weird shape (see A6_blob.png)
 	if filename[:2] == "A6":
 		blobs = [ cv2.contourArea(cv2.convexHull(contour)) for contour in contours ]
 	blobs.sort()
 	area = blobs[-1]
 
-	for c in contours:
-		cv2.drawContours(img, [c], 0, randomColor(), 2)
+	if debug:
+		# Display contours with colorful lines
+		for c in contours:
+			cv2.drawContours(img, [c], 0, randomColor(), 2)
+
+		# Display area of blob in pixels above it
+		x, y, _, _ = cv2.boundingRect(sorted(contours, key=cv2.contourArea)[-1])
+		pos_x = x
+		pos_y = y - 40
+		text = f"A = {int(area):,}px".replace(",", " ")
+
+		# Hack to draw text with shadow
+		cv2.putText(img, text, (pos_x, pos_y), cv2.FONT_HERSHEY_SIMPLEX, 1.5, BLACK, 10, cv2.LINE_AA)
+		cv2.putText(img, text, (pos_x, pos_y), cv2.FONT_HERSHEY_SIMPLEX, 1.5, WHITE, 4, cv2.LINE_AA)
+
+		showImage(f"Blob Mask {filename}", img)
+		new_filename = filename.split(".")[0] + "_blob.png"
+		cv2.imwrite(LOCAL / "w12_out" / new_filename, img)
 	
-	# showImage(f"Blob Mask {filename}", img)
-	new_filename = filename.split(".")[0] + "_blob.png"
-	# cv2.imwrite(LOCAL / "w12_out" / new_filename, img)
 	return area
 
 I = list(enumerate(images))[0:]
-
 errors = []
+
 for i, img in I:
 	filename = filenames[i]
 	
-	distance_px = findGridSize(filename, img)
-	area_px = findDropArea(filename, img)
+	distance_px = findGridSize(filename, img, False)
+	area_px = findDropArea(filename, img, False)
 	area_cm2 = area_px/(distance_px**2)
 
 	# ±3.5 pixels for line finding due to lines themselves being around 7 pixels wide
