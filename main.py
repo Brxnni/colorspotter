@@ -1,5 +1,4 @@
 from shapely.geometry import LineString
-# from scipy.stats import mode
 import colorsys
 import random
 import numpy as np
@@ -10,10 +9,10 @@ import os
 import pathlib
 LOCAL = pathlib.Path(__file__).parent
 IMAGES = LOCAL / "w12_images"
-images = [ cv2.imread(IMAGES / path) for path in os.listdir(IMAGES) ]
 filenames = [ path for path in os.listdir(IMAGES) ]
+images = [ cv2.imread(IMAGES / filename) for filename in filenames ]
 
-# Common use colors
+# Commonly used colors
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
 BLUE = (255, 0, 0)
@@ -25,8 +24,7 @@ MAGENTA = (255, 0, 255)
 
 def find_mode(nums, epsilon):
 	nums.sort()
-	maxn = nums[-1]
-	prev = maxn
+	prev = nums[-1]
 	mode = 0
 	maxcount = 0
 	current = 0
@@ -44,52 +42,35 @@ def find_mode(nums, epsilon):
 	return mode
 
 # Scales image before calling `imshow` down so it fits on my monitor (only 2k smh)
-def showImage(title, i, scale=True):
-	max_h, h = 950, len(i),
-	max_w, w = 1900, len(i[0]),
+def showImage(title, img, scale=True):
+	max_h, max_w = 950, 1900
+	h, w = img.shape[:2]
 
 	mh = h / max_h
 	mw = w / max_w
 
 	m = max(mh, mw)
 	if m != 1 and scale:
-		i = cv2.resize(i, None, fx=1/m, fy=1/m)
+		img = cv2.resize(img, None, fx=1/m, fy=1/m)
 	
-	cv2.imshow(title, i)
+	cv2.imshow(title, img)
 
 def randomColor():
-	return tuple(
-		# RGB -> BGR
-		reversed(
-			# RGB(normalized) -> RGB(0-255,0-255,0-255)
-			[ round(i*255) for i in colorsys.hsv_to_rgb(
-				# HSV(normalized) -> RGB(normalized)
-				random.random(), 1, 1)
-			]
-		)
-	)
+	return tuple(reversed([ round(i*255) for i in colorsys.hsv_to_rgb(
+		random.random(), 1, 1
+	)]))
 
-# Theta [-π, π] -> Bright Color
+# Angle [-π, π] -> Bright Color
 def angleToColor(θ):
-	# -> [0, 2π]
-	θ += np.pi
-	return tuple(
-		reversed(
-			[ round(i*255) for i in colorsys.hsv_to_rgb(
-				θ/(2*np.pi), 1, 1
-			)]
-		)
-	)
+	return tuple(reversed([ round(i*255) for i in colorsys.hsv_to_rgb(
+		(θ+np.pi)/(2*np.pi), 1, 1
+	)]))
 
-# [0, 1] -> Bright color
+# Position [0, 1] -> Bright color
 def coordToColor(normalized):
-	return tuple(
-		reversed(
-			[ round(i*255) for i in colorsys.hsv_to_rgb(
-				(normalized * 3) % 1, 1, 1
-			)]
-		)
-	)
+	return tuple(reversed([ round(i*255) for i in colorsys.hsv_to_rgb(
+		(normalized * 3) % 1, 1, 1
+	)]))
 
 def intersectionDistance(lines1, lines2):
 	lines1 = [ LineString([line["pt1"], line["pt2"]]) for line in lines1 ]
@@ -132,7 +113,7 @@ def findGridSize(filename, i, debug=False):
 	# Filter for only red-ish pixels, make everything else black
 	filtered = cv2.bitwise_and(img, img, mask=mask)
 
-	# HSV -> Grayscale to find lines
+	# HSV -> Grayscale, find lines
 	bgr = cv2.cvtColor(filtered, cv2.COLOR_HSV2BGR)
 	gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
 	lines = cv2.HoughLinesP(gray, rho=1, theta=np.pi/180, threshold=255, minLineLength=80, maxLineGap=7)
@@ -158,11 +139,14 @@ def findGridSize(filename, i, debug=False):
 	lines1 = [ line for line in lines if θ_range1[0] <= line["angle"] <= θ_range1[1] ]
 	lines2 = [ line for line in lines if θ_range2[0] <= line["angle"] <= θ_range2[1] ]
 
+	# Find most common distance between intersection points of vertical and horizontal lines
+	# => thats 1cm
 	points, cm_distance = intersectionDistance(lines1, lines2)
 
 	# SPECIAL CASE: Only in these two images (everywhere else it works perfectly),
 	# the program returns the distance between the 5mm lines (because it detected them too),
 	# so the distance needs to be doubled
+	# This makes me a bad opencv developer
 	if filename[:2] in ["B1", "B2"]:
 		cm_distance *= 2
 
@@ -179,7 +163,7 @@ def findGridSize(filename, i, debug=False):
 			cv2.circle(out, (x, y), 8, WHITE, 3, cv2.LINE_AA)
 			cv2.line(out, (x, y), (x, y + int(cm_distance)), coordToColor(y/img.shape[0]), 6)
 
-		# Display length of line in pixels
+		# Display length of line in pixels next to one line (the most top-left one that has enough space above)
 		x, y = sorted([p for p in points if p[1] > 120])[0]
 		pos_x = int(x)
 		pos_y = int(y - 40)
@@ -188,14 +172,14 @@ def findGridSize(filename, i, debug=False):
 		cv2.putText(out, text, (pos_x, pos_y), cv2.FONT_HERSHEY_SIMPLEX, 1.5, BLACK, 10, cv2.LINE_AA)
 		cv2.putText(out, text, (pos_x, pos_y), cv2.FONT_HERSHEY_SIMPLEX, 1.5, WHITE, 4, cv2.LINE_AA)
 
-		showImage(f"Detected Lines {filename}", out)
+		showImage(f"{filename} :: Detected Lines", out)
 		new_filename = filename.split(".")[0] + "_lines.png"
 		cv2.imwrite(LOCAL / "w12_out" / new_filename, out)
 	
 	return cm_distance
 
 def findDropArea(filename, img, debug=False):
-	# Filter out purple 
+	# Filter out specific shade of purple that belongs to the KMnO4 crystals 
 	hsv_image = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
 	# Dark Purple
 	mask_1 = cv2.inRange(hsv_image, (270/360*180, 0, 0), (340/360*180, 255, 90))
@@ -203,16 +187,20 @@ def findDropArea(filename, img, debug=False):
 	mask_2 = cv2.inRange(hsv_image, (0, 0, 0), (180, 255, 47)) # <- last V value is this and not 30 because of A6
 	blob_mask = cv2.bitwise_or(mask_1, mask_2)
 
-	# A1 is so fucking tiny that smoothing gets rid of the blob completely
+	# Get rid of tiny sharp edges where the blob touches lines
+	# A1 is so fucking tiny that smoothing would get rid of the blob completely
 	if not filename.startswith("A1"):
 		blob_mask = cv2.morphologyEx(blob_mask, cv2.MORPH_OPEN, np.ones((3, 3)))
 
+	# Find continous blobs of color
 	contours, _ = cv2.findContours(blob_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
 	blobs = [ cv2.contourArea(contour) for contour in contours ]
 	# A6 is weird because the red line is visible through the purple blob,
 	# so we need to get the convex hull to account for the weird shape (see A6_blob.png)
 	if filename[:2] == "A6":
 		blobs = [ cv2.contourArea(cv2.convexHull(contour)) for contour in contours ]
+
+	# Biggest blob is the one we want
 	blobs.sort()
 	area = blobs[-1]
 
@@ -231,18 +219,15 @@ def findDropArea(filename, img, debug=False):
 		cv2.putText(img, text, (pos_x, pos_y), cv2.FONT_HERSHEY_SIMPLEX, 1.5, BLACK, 10, cv2.LINE_AA)
 		cv2.putText(img, text, (pos_x, pos_y), cv2.FONT_HERSHEY_SIMPLEX, 1.5, WHITE, 4, cv2.LINE_AA)
 
-		showImage(f"Blob Mask {filename}", img)
+		showImage(f"{filename} :: Detected Blob", img)
 		new_filename = filename.split(".")[0] + "_blob.png"
 		cv2.imwrite(LOCAL / "w12_out" / new_filename, img)
 	
 	return area
 
-I = list(enumerate(images))[0:]
 errors = []
 
-for i, img in I:
-	filename = filenames[i]
-	
+for i, (filename, img) in enumerate(zip(filenames, images)):
 	distance_px = findGridSize(filename, img, False)
 	area_px = findDropArea(filename, img, False)
 	area_cm2 = area_px/(distance_px**2)
@@ -255,7 +240,11 @@ for i, img in I:
 	errors.append(total_error_rel)
 
 	area_str = f"{round(area_cm2, 7)} ≈ {round(area_cm2, 3)}"
-	print(filename.split(".")[0], "|", "Area:", f"{area_str:<17}", " ; ", f"Error: ±{round(total_error_rel*100, 2)}%")
+	print(
+		filename.split(".")[0],
+		f"| Area: {area_str:<17} ",
+		f"; Error: ±{round(total_error_rel*100, 2)}%"
+	)
 
 print("Total average error:", round(100*sum(errors)/len(errors), 2), "%")
 
