@@ -1,16 +1,25 @@
-# The Plan
+# colorspotter
 
-## Lines
+Made for a friend of mine :3 Finds the purple blob (which is a diffusing potassium permanganate crystal) overlaid on top of graphing paper and uses that to calculate its real-world area to estimate its volume.
 
-* ✅ Find right contrast value such that multiple 1cm lines are found
-* ✅ Try to find lines that are parallel (i.e. have a similar angle)
+In total, the experiment included 3 crystal experiments (A-C) of 6 photos (1-6) of different moments in time each. Unfortunately, the photos had some variation in lighting and huge variations in quality, affecting the measurement accuracy a lot:
 
-## Circle
+## [B3] Very good image (error=±1.33%*)
 
-* ✅ Find pixes of the right color (+- tolerance of course), starting from the center of the image
-* ✅ Fill out blob shape from within such that pixels inside the blob are counted too, even if they don't fit the criteria
+|Original|Found blobs|Found lines|
+|---|---|---|
+|![original](https://github.com/Brxnni/colorspotter/blob/78854070a3b494cc14ba34df76c3b29394a9e6b5/w12_images/B3.jpeg)|![blob](https://github.com/Brxnni/colorspotter/blob/78854070a3b494cc14ba34df76c3b29394a9e6b5/w12_out/B3_blob.png)|![lines](https://github.com/Brxnni/colorspotter/blob/78854070a3b494cc14ba34df76c3b29394a9e6b5/w12_out/B3_lines.png)|
 
-## Final
+## [A2] Decent image (error=±9.38%*)
 
-* ✅ Find the lines closest to the purple circle -> two lines are 1mm apart
-* ✅ Use those lines' pixel distances to calculate the relationship between pixels and real-world units -> calculate actual area of the drop in the image
+|Original|Found blobs|Found lines|
+|---|---|---|
+|![original](https://github.com/Brxnni/colorspotter/blob/78854070a3b494cc14ba34df76c3b29394a9e6b5/w12_images/A2.jpeg)|![blob](https://github.com/Brxnni/colorspotter/blob/78854070a3b494cc14ba34df76c3b29394a9e6b5/w12_out/A2_blob.png)|![lines](https://github.com/Brxnni/colorspotter/blob/78854070a3b494cc14ba34df76c3b29394a9e6b5/w12_out/A2_lines.png)|
+
+## [B1] Rock bottom of the barrel (error=±14.03%*)
+
+|Original|Found blobs|Found lines|
+|---|---|---|
+|![original](https://github.com/Brxnni/colorspotter/blob/78854070a3b494cc14ba34df76c3b29394a9e6b5/w12_images/B1.jpeg)|![blob](https://github.com/Brxnni/colorspotter/blob/78854070a3b494cc14ba34df76c3b29394a9e6b5/w12_out/B1_blob.png)|![lines](https://github.com/Brxnni/colorspotter/blob/78854070a3b494cc14ba34df76c3b29394a9e6b5/w12_out/B1_lines.png)|
+
+\*: See main python file to find out how this error is calculated
