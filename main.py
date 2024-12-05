@@ -84,11 +84,13 @@ def intersectionDistance(lines1, lines2):
 				intersection = line1.intersection(line2)
 				points.append((intersection.x, intersection.y))
 
+	# This algorithm is about as stable as a house of cards
 	neighbour_distances = []
 	for point in points:
 		distances = []
 		for other_point in points:
 			distance = math.hypot(abs(point[0]-other_point[0]), abs(point[1]-other_point[1]))
+			# Magic number (?), this one is fairly straight-forward though
 			if distance <= 20: continue
 			distances.append(distance)
 
@@ -105,17 +107,18 @@ def intersectionDistance(lines1, lines2):
 def findGridSize(filename, i, debug=False):
 	img = cv2.cvtColor(i, cv2.COLOR_BGR2HSV)
 	# Find red-ish pixels (lines)
+	# these are magic values, change these and nothing works :D
 	lower = np.array([5/360*180, 100, 70])
 	upper = np.array([50/360*180, 245, 200])
-	# ^ these are magic values, change these and nothing works :D
 	mask = cv2.inRange(img, lower, upper)
 
 	# Filter for only red-ish pixels, make everything else black
 	filtered = cv2.bitwise_and(img, img, mask=mask)
 
-	# HSV -> Grayscale, find lines
+	# HSV -> Grayscale
 	bgr = cv2.cvtColor(filtered, cv2.COLOR_HSV2BGR)
 	gray = cv2.cvtColor(bgr, cv2.COLOR_BGR2GRAY)
+	# find lines
 	lines = cv2.HoughLinesP(gray, rho=1, theta=np.pi/180, threshold=255, minLineLength=80, maxLineGap=7)
 
 	lines = [{
@@ -125,9 +128,12 @@ def findGridSize(filename, i, debug=False):
 		"x1": x1, "y1": y1,
 		"x2": x2, "y2": y2,
 		# Angle & Slope
+		# (-y2-y1) because in opencv, the origin is at the top left
+		# and atan2 thinks it should be at the bottom
 		"angle": abs(math.atan2(-(y2-y1), x2-x1))
 	} for line in lines for (x1, y1, x2, y2) in line ]
 
+	# Magic number: 25 bins seems to work the best for these images
 	hist, bin_edges = np.histogram([ line["angle"] for line in lines ], bins = 25)
 
 	# Find two most common angles (these correspond to the vertical and horizontal lines)
@@ -235,7 +241,7 @@ for i, (filename, img) in enumerate(zip(filenames, images)):
 	# ±3.5 pixels for line finding due to lines themselves being around 7 pixels wide
 	distance_error_abs = 3.5
 	distance_error_rel = distance_error_abs / distance_px
-	# Total error: Area error (=0) + 2 * Distance Error
+	# Total error: Area error (≈0) + 2 * Distance Error
 	total_error_rel = 2*distance_error_rel
 	errors.append(total_error_rel)
 
