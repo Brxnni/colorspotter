@@ -22,6 +22,14 @@ YELLOW = (0, 255, 255)
 CYAN = (255, 255, 0)
 MAGENTA = (255, 0, 255)
 
+# Terminal colors
+T_YELLOW = "\033[93m"
+T_RED = "\033[91m"
+T_LIGHT_BLUE = "\033[36m"
+T_GRAY = "\033[90m"
+T_BOLD = "\033[1m"
+END = "\033[0m"
+
 def find_mode(nums, epsilon):
 	nums.sort()
 	prev = nums[-1]
@@ -134,7 +142,7 @@ def findGridSize(filename, i, debug=False):
 	} for line in lines for (x1, y1, x2, y2) in line ]
 
 	# Magic number: 25 bins seems to work the best for these images
-	hist, bin_edges = np.histogram([ line["angle"] for line in lines ], bins = 25)
+	hist, bin_edges = np.histogram([ line["angle"] for line in lines ], bins=25)
 
 	# Find two most common angles (these correspond to the vertical and horizontal lines)
 	bin_idx1, bin_idx2 = np.argpartition(hist, -2)[-2:]
@@ -232,10 +240,11 @@ def findDropArea(filename, img, debug=False):
 	return area
 
 errors = []
+DEBUG = False
 
 for i, (filename, img) in enumerate(zip(filenames, images)):
-	distance_px = findGridSize(filename, img, False)
-	area_px = findDropArea(filename, img, False)
+	distance_px = findGridSize(filename, img, DEBUG)
+	area_px = findDropArea(filename, img, DEBUG)
 	area_cm2 = area_px/(distance_px**2)
 
 	# ±3.5 pixels for line finding due to lines themselves being around 7 pixels wide
@@ -245,13 +254,15 @@ for i, (filename, img) in enumerate(zip(filenames, images)):
 	total_error_rel = 2*distance_error_rel
 	errors.append(total_error_rel)
 
-	area_str = f"{round(area_cm2, 7)} ≈ {round(area_cm2, 3)}"
+	area_str = f"{area_cm2:.7f}... ≈ {T_LIGHT_BLUE}{area_cm2:.3f} cm^2{END}"
 	print(
-		filename.split(".")[0],
-		f"| Area: {area_str:<17} ",
-		f"; Error: ±{round(total_error_rel*100, 2)}%"
+		T_BOLD + filename.split(".")[0] + END,
+		f"{T_GRAY}|{END}",
+		f"Area: {area_str:<17}",
+		f"{T_GRAY}|{END}",
+		f"Error: {T_YELLOW}±{(total_error_rel*100):.2f}%{END}"
 	)
 
-print("Total average error:", round(100*sum(errors)/len(errors), 2), "%")
+print(f"Total average error: {T_BOLD}{T_YELLOW}{(sum(errors)/len(errors)*100):.2f}%{END}")
 
-cv2.waitKey(0)
+if DEBUG: cv2.waitKey(0)
