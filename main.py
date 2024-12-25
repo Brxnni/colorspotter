@@ -10,25 +10,15 @@ import pathlib
 LOCAL = pathlib.Path(__file__).parent
 IMAGES = LOCAL / "w12_images"
 filenames = [ path for path in os.listdir(IMAGES) ]
-images = [ cv2.imread(IMAGES / filename) for filename in filenames ]
+images = []
+for i, filename in enumerate(filenames):
+	print(f"Reading images... {i+1}/{len(filenames)}", end="\r")
+	images.append(cv2.imread(IMAGES / filename))
+print()
 
 # Commonly used colors
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
-BLUE = (255, 0, 0)
-GREEN = (0, 255, 0)
-RED = (0, 0, 255)
-YELLOW = (0, 255, 255)
-CYAN = (255, 255, 0)
-MAGENTA = (255, 0, 255)
-
-# Terminal colors
-T_YELLOW = "\033[93m"
-T_RED = "\033[91m"
-T_LIGHT_BLUE = "\033[36m"
-T_GRAY = "\033[90m"
-T_BOLD = "\033[1m"
-END = "\033[0m"
 
 def find_mode(nums, epsilon):
 	nums.sort()
@@ -112,7 +102,7 @@ def intersectionDistance(lines1, lines2):
 
 	return points, mode
 
-def findGridSize(filename, i, debug=False):
+def findGridSize(filename, i, debug=False, write=False):
 	img = cv2.cvtColor(i, cv2.COLOR_BGR2HSV)
 	# Find red-ish pixels (lines)
 	# these are magic values, change these and nothing works :D
@@ -188,11 +178,11 @@ def findGridSize(filename, i, debug=False):
 
 		showImage(f"{filename} :: Detected Lines", out)
 		new_filename = filename.split(".")[0] + "_lines.png"
-		cv2.imwrite(LOCAL / "w12_out" / new_filename, out)
+		if write: cv2.imwrite(LOCAL / "w12_out" / new_filename, out)
 	
 	return cm_distance
 
-def findDropArea(filename, img, debug=False):
+def findDropArea(filename, img, debug=False, write=False):
 	# Filter out specific shade of purple that belongs to the KMnO4 crystals 
 	hsv_image = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
 	# Dark Purple
@@ -235,14 +225,16 @@ def findDropArea(filename, img, debug=False):
 
 		showImage(f"{filename} :: Detected Blob", img)
 		new_filename = filename.split(".")[0] + "_blob.png"
-		cv2.imwrite(LOCAL / "w12_out" / new_filename, img)
+		if write: cv2.imwrite(LOCAL / "w12_out" / new_filename, img)
 	
 	return area
 
-errors = []
+data = []
 DEBUG = False
 
 for i, (filename, img) in enumerate(zip(filenames, images)):
+	print(f"Processing images... {i+1}/{len(images)}", end="\r")
+
 	distance_px = findGridSize(filename, img, DEBUG)
 	area_px = findDropArea(filename, img, DEBUG)
 	area_cm2 = area_px/(distance_px**2)
@@ -252,17 +244,11 @@ for i, (filename, img) in enumerate(zip(filenames, images)):
 	distance_error_rel = distance_error_abs / distance_px
 	# Total error: Area error (≈0) + 2 * Distance Error
 	total_error_rel = 2*distance_error_rel
-	errors.append(total_error_rel)
 
-	area_str = f"{area_cm2:.7f}... ≈ {T_LIGHT_BLUE}{area_cm2:.3f} cm^2{END}"
-	print(
-		T_BOLD + filename.split(".")[0] + END,
-		f"{T_GRAY}|{END}",
-		f"Area: {area_str:<17}",
-		f"{T_GRAY}|{END}",
-		f"Error: {T_YELLOW}±{(total_error_rel*100):.2f}%{END}"
-	)
+	data.append((filename, area_cm2, total_error_rel))
 
-print(f"Total average error: {T_BOLD}{T_YELLOW}{(sum(errors)/len(errors)*100):.2f}%{END}")
+from lib import print_data
+print()
+print_data(data)
 
 if DEBUG: cv2.waitKey(0)
