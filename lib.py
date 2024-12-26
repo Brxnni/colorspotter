@@ -60,8 +60,12 @@ def debug_histogram():
 	# plt.show()
 
 	## Areas bar chart
-	plt.bar(range(len(data_areas)), data_areas, edgecolor="black")
-	plt.xlim(0, len(data_areas))
+	_, ax = plt.subplots(figsize=(8, 6))
+
+	ax.bar(range(len(data_areas)), data_areas, edgecolor="black")
+	ax.set_xticks(range(18), [a+b for a in "ABC" for b in "123456"])
+
+	ax.set_xlim(-1, len(data_areas))
 	plt.show()
 
 if __name__ == "__main__": debug_histogram()
