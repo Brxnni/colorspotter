@@ -8,7 +8,7 @@ import os
 
 import pathlib
 LOCAL = pathlib.Path(__file__).parent
-IMAGES = LOCAL / "w12_images"
+IMAGES = LOCAL / "w05_images"
 filenames = [ path for path in os.listdir(IMAGES) ]
 images = []
 for i, filename in enumerate(filenames):
@@ -36,7 +36,7 @@ def find_mode(nums, epsilon):
 		else:
 			current = 1
 		prev = n
-	
+
 	return mode
 
 # Scales image before calling `imshow` down so it fits on my monitor (only 2k smh)
@@ -50,7 +50,7 @@ def showImage(title, img, scale=True):
 	m = max(mh, mw)
 	if m != 1 and scale:
 		img = cv2.resize(img, None, fx=1/m, fy=1/m)
-	
+
 	cv2.imshow(title, img)
 
 def randomColor():
@@ -178,8 +178,8 @@ def findGridSize(filename, i, debug=False, write=False):
 
 		showImage(f"{filename} :: Detected Lines", out)
 		new_filename = filename.split(".")[0] + "_lines.png"
-		if write: cv2.imwrite(LOCAL / "w12_out" / new_filename, out)
-	
+		if write: cv2.imwrite(LOCAL / "w05_out" / new_filename, out)
+
 	return cm_distance
 
 def findDropArea(filename, img, debug=False, write=False):
@@ -225,8 +225,8 @@ def findDropArea(filename, img, debug=False, write=False):
 
 		showImage(f"{filename} :: Detected Blob", img)
 		new_filename = filename.split(".")[0] + "_blob.png"
-		if write: cv2.imwrite(LOCAL / "w12_out" / new_filename, img)
-	
+		if write: cv2.imwrite(LOCAL / "w05_out" / new_filename, img)
+
 	return area
 
 data = []
